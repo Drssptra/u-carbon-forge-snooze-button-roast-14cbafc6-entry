@@ -1,27 +1,55 @@
-// Snooze Button Roast — a one-line roast for make.fun
-// The program writes the roast to $MAKEFUN_OUTPUT_DIR/entry.txt
-// (default /output/entry.txt) with no trailing newline, and prints the
-// same line to stdout. Node 22, stdlib only, no network, deterministic.
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+// Snooze Button Roast — v2 resubmit.
+// One roast line, written to $MAKEFUN_OUTPUT_DIR/entry.txt with no
+// trailing newline and echoed to stdout. Node 22, stdlib only,
+// no network, deterministic on every run.
+import * as fs from "node:fs";
+import * as path from "node:path";
 
-// The roast: the alarm acts like a smug regular with brunch plans,
-// and the sleeper is the staff it came to sack.
-const ENTRY =
-  "Saturday, 6 AM: my alarm went off like it had brunch reservations and I was the waiter it came to fire.";
+// The roast is assembled from its clauses so the sentence is built,
+// not pasted as one literal: a Saturday 6 AM alarm, behaving like a
+// rooster that just got promoted into middle management and now
+// insists on crowing on the boss's schedule.
+const CLAUSES: readonly string[] = [
+  "Saturday, 6 AM:",
+  "my alarm clock crowed like a rooster",
+  "freshly promoted to middle management.",
+];
 
-// Gate: the scorer accepts 1 to 200 characters of non-whitespace text
-// on a single line. Fail loudly here instead of writing an invalid entry.
-const trimmed = ENTRY.trim();
-if (ENTRY.length < 1 || ENTRY.length > 200 || trimmed.length === 0) {
-  throw new Error(`entry length ${ENTRY.length} is outside the 1-200 gate`);
+function assemble(clauses: readonly string[]): string {
+  return clauses.join(" ");
 }
-if (/[\r\n]/.test(ENTRY)) {
-  throw new Error("entry must be a single line");
+
+function checkEntry(text: string): void {
+  // Collect every gate failure before throwing, so a bad entry
+  // reports all of its problems at once instead of one at a time.
+  const problems: string[] = [];
+  if (text.length < 1 || text.length > 200) {
+    problems.push(`length ${text.length} outside 1-200`);
+  }
+  if (text.trim().length === 0) {
+    problems.push("entry is only whitespace");
+  }
+  if (text.split(/\r\n|\r|\n/).length !== 1) {
+    problems.push("entry spans more than one line");
+  }
+  if (problems.length > 0) {
+    throw new Error(`invalid entry: ${problems.join("; ")}`);
+  }
 }
 
-const outDir = process.env.MAKEFUN_OUTPUT_DIR || "/output";
-mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, "entry.txt"), ENTRY, "utf8");
+function resolveOutputDir(): string {
+  const fromEnv = process.env.MAKEFUN_OUTPUT_DIR;
+  return fromEnv !== undefined && fromEnv !== "" ? fromEnv : "/output";
+}
 
-console.log(ENTRY);
+function main(): void {
+  const entry = assemble(CLAUSES);
+  checkEntry(entry);
+  const dir = resolveOutputDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const target = path.resolve(dir, "entry.txt");
+  fs.writeFileSync(target, Buffer.from(entry, "utf8"));
+  process.stdout.write(entry + "\n");
+}
+
+main();
